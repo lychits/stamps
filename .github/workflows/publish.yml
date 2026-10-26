@@ -12,9 +12,9 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -22,17 +22,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-      - name: Restore and verify catalogue files
-        run: python3 publication/restore.py
-      - name: Save catalogue and photographs in this repository
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets index.html catalog.json catalogue-offline.zip research-report.md catalog-source.json Deep_Research_Report.md
-          if ! git diff --cached --quiet; then
-            git commit -m "Import verified catalogue and photographs (477 specimens)"
-            git push origin HEAD:main
-          fi
+      - name: Validate and stage repository files
+        run: python3 publication/stage.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
