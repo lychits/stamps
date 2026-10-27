@@ -17,7 +17,7 @@ for stamp in catalogue["stamps"]:
 stage = ROOT / "_site"
 stage.mkdir(exist_ok=True)
 shutil.copytree(ROOT / "assets", stage / "assets", dirs_exist_ok=True)
-for name in ("index.html", "catalog.json", "research-report.md", "catalogue-offline.zip"):
+for name in ("index.html", "catalog.json", "research-report.md", "Full_Visual_Audit_2026-10-27.md", "Full_Visual_Audit_2026-10-27.json", "catalogue-offline.zip"):
     shutil.copy2(ROOT / name, stage / name)
 (stage / ".nojekyll").write_text("")
 print(f"Staged {len(catalogue['stamps'])} specimens from repository files.")
