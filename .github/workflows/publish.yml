@@ -22,6 +22,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
+      - name: Build website and current offline archive
+        run: |
+          python3 -m pip install --user 'Pillow==12.3.0'
+          python3 build_catalog.py
       - name: Validate and stage repository files
         run: python3 publication/stage.py
       - uses: actions/configure-pages@v5

@@ -2,3 +2,4 @@ _site/
 exports/
 __pycache__/
 *.download
+catalogue-offline.zip
