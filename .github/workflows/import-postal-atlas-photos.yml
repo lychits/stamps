@@ -1,0 +1,52 @@
+name: Import Postal Atlas photographs
+on:
+  push:
+    branches: [publish-postal-atlas-493]
+    paths: [atlas/photo-hashes.json]
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify the public album photographs
+        shell: python
+        run: |
+          from concurrent.futures import ThreadPoolExecutor
+          from hashlib import sha256
+          import json, pathlib, re, time, urllib.request
+          root = pathlib.Path('atlas')
+          pairs = json.loads((root / 'photo-hashes.json').read_text()).items()
+          assert len(pairs) == 986
+          def fetch(pair):
+              name, expected = pair
+              assert re.fullmatch(r'(assets/P\d{2}-\d{2}\.png|thumbs/P\d{2}-\d{2}\.webp)', name)
+              assert re.fullmatch('[a-f0-9]{64}', expected)
+              target = root / name
+              target.parent.mkdir(exist_ok=True)
+              if target.exists() and sha256(target.read_bytes()).hexdigest() == expected:
+                  return
+              for attempt in range(4):
+                  try:
+                      with urllib.request.urlopen('https://marki-atlas.lychitsv.chatgpt.site/' + name, timeout=60) as response:
+                          data = response.read(20_000_001)
+                      assert len(data) <= 20_000_000 and sha256(data).hexdigest() == expected, name
+                      target.write_bytes(data)
+                      return
+                  except Exception:
+                      if attempt == 3:
+                          raise
+                      time.sleep(2 ** attempt)
+          with ThreadPoolExecutor(max_workers=6) as pool:
+              list(pool.map(fetch, pairs))
+      - name: Store the verified photographs on the publication branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- atlas/assets atlas/thumbs
+          if ! git diff --cached --quiet; then
+            git commit -m "Import the 493 photographs and thumbnails for Postal Atlas"
+            git push origin HEAD:publish-postal-atlas-493
+          fi
