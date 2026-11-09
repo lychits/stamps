@@ -10,11 +10,15 @@ const confirmed=r=>r.identified===true||/^подтвержд/i.test(r.status||''
 const vals=(a)=>[...new Set(a.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'ru',{numeric:true}));
 const opts=(id,items)=>{el(id).replaceChildren(new Option('Любые',''),...vals(items).map(v=>new Option(v,v)))};
 const fields=[
+ ['albumPage','Страница альбома'],['batch','Поступление'],
  ['series','Серия'],['catalogSystem','Каталог'],['catalogNo','Каталожный номер','text'],['face','Номинал'],['oneYear','Точный год'],['yearMin','Год от','number'],['yearMax','Год до','number'],['cancellation','Гашение'],['conditionGroup','Состояние'],['type','Тип объекта'],['ident','Идентификация'],['estimate','Наличие оценки'],['quoteKind','Ценовые данные'],['basis','Основание оценки'],['minPrice','Стоимость от, ₽','number'],['maxPrice','Стоимость до, ₽','number']
 ];
 el('advanced').innerHTML=fields.map(([id,label,type])=>'<label><span>'+label+'</span>'+(type?'<input id="'+id+'" type="'+type+'"'+(type==='number'?' min="0"':'')+'>':'<select id="'+id+'"></select>')+'</label>').join('');
 const systems=r=>r.catalogSystems||(['АО «Марка»','ЦФА','Michel','Scott','Yvert','Загорский','Соловьёв','Stanley Gibbons','Rusphil','Stampworld','StampWorld','Fischer','ИТЦ «Марка»','MOK','Colnect'].filter(x=>(r.catalogue||'').includes(x)));
 for(const key of ['country','topic','series','face','cancellation','conditionGroup','type'])opts(key,records.map(r=>r[key]));
+const albumLabel=r=>'Страница '+String(Number(r.id.slice(1,3))).padStart(2,'0');
+const batchLabel=r=>Number(r.id.slice(1,3))>=18?'Добавлено 09.11.2026':'Исходный каталог';
+opts('albumPage',records.map(albumLabel));opts('batch',records.map(batchLabel));
 opts('oneYear',records.map(r=>r.year));opts('type',[...records.map(r=>r.type),'Отдельная марка','Блок','Пара','Сцепка']);opts('cancellation',['Гашёная','Негашёная','Гашение не установлено']);opts('catalogSystem',records.flatMap(systems));opts('ident',['Подтверждена','Требует уточнения']);opts('estimate',['Есть оценка','Без оценки']);
 opts('quoteKind',['Состоявшиеся сделки','Продажи отдельных марок и блоков','Продажи комплектов и лотов','Цены продавцов','Каталожные цены']);
 let page=1,matching=[],selected=null;const size=32,allIds=['search','country','topic',...fields.map(x=>x[0])];
@@ -22,8 +26,10 @@ const v=id=>el(id).value.trim(),norm=s=>String(s??'').toLocaleLowerCase('ru').re
 const basisNames={sold:'По сделкам',asking:'По предложениям',catalogue:'По каталогу',none:'Без оценки'};
 opts('basis',Object.values(basisNames));
 const quoteLabels={sold:'Состоявшиеся сделки',asking:'Цены продавцов',catalogue:'Каталожные цены'};
-const facetIds=['country','topic','series','face','oneYear','catalogSystem','cancellation','conditionGroup','type','ident','estimate','quoteKind','basis'];
+const facetIds=['country','topic','series','face','oneYear','catalogSystem','cancellation','conditionGroup','type','ident','estimate','quoteKind','basis','albumPage','batch'];
 function facetValues(r,id){
+ if(id==='albumPage')return [albumLabel(r)];
+ if(id==='batch')return [batchLabel(r)];
  if(id==='oneYear')return r.year?[String(r.year)]:[];
  if(id==='catalogSystem')return systems(r);
  if(id==='ident')return [confirmed(r)?'Подтверждена':'Требует уточнения'];
@@ -139,9 +145,10 @@ function marketPanel(r){
 }
 function show(id){
  const r=records.find(x=>x.id===id);if(!r)return;selected=id;
- const rows=[['Страна / территория',r.country],['Серия',r.series],['Год выпуска',r.year],['Дата выпуска',r.issueDate],['Номинал',r.face],['Валюта',r.currency],['Тип объекта',r.type],['Тематика',r.topic],['Каталог и номер',r.catalogue],['Разновидность',r.variant],['Гашение',r.cancellation],['Состояние',r.condition],['Видимые дефекты',r.defects],['Идентификация',r.status],['Уверенность',r.confidence],['Поштучный ориентир',price(r)]];
+ const rows=[['Страна / территория',r.country],['Серия',r.series],['Год выпуска',r.year],['Дата выпуска',r.issueDate],['Номинал',r.face],['Валюта',r.currency],['Тип объекта',r.type],['Марок в объекте',Number.isFinite(r.stampCount)?String(r.stampCount):''],['Тематика',r.topic],['Каталог и номер',r.catalogue],['Разновидность',r.variant],['Гашение',r.cancellation],['Состояние',r.condition],['Видимые дефекты',r.defects],['Идентификация',r.status],['Уверенность',r.confidence],['Поштучный ориентир',price(r)]];
  const para=(t)=>t?'<p>'+esc(t)+'</p>':'';
  el('detailbody').innerHTML='<div class="spread"><a class="plate" href="'+esc(r.image)+'" target="_blank" rel="noopener" aria-label="Открыть изображение целиком"><img src="'+esc(r.image)+'" alt="'+esc(r.title)+'"></a><div class="info"><div class="eyebrow">Экземпляр '+esc(r.id)+'</div><h2 id="detailtitle">'+esc(r.title)+'</h2><div class="detail-links"><button type="button" data-jump="detailPrices">Цены и сделки ↓</button><button type="button" data-jump="detailPassport">Паспорт ↓</button></div>'+para(r.description)+'<section class="story"><h3>История выпуска</h3>'+para(r.history)+'<p class="note"><b>Автор оформления</b> · '+esc(r.designer||'В доступных источниках не указан')+'</p></section><dl id="detailPassport">'+rows.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v||'Не установлено')+'</dd>').join('')+'</dl>'+para(r.notes)+marketPanel(r)+(r.keywords?.length?'<p class="note">'+esc(r.keywords.join(' · '))+'</p>':'')+(r.sources?.length?'<p><b>Источники</b></p><ul>'+r.sources.map(s=>'<li>'+((/^https?:\/\//.test(s.url))?'<a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.title||s.url)+'</a>':esc(s.title||s))+'</li>').join('')+'</ul>':'')+'<p class="note">Атрибуция выполнена по фотографии. Подлинность требует отдельной экспертизы.</p></div></div>';
+ if(r.albumImage){const provenance=document.createElement('p');provenance.className='note';provenance.innerHTML='<a href="'+esc(r.albumImage)+'" target="_blank" rel="noopener">Исходная фотография · '+esc(albumLabel(r))+' ↗</a>'+(r.source?'<br>'+esc(r.source):'');el('detailbody').querySelector('.info').append(provenance);}
  el('detailbody').querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>el(b.dataset.jump).scrollIntoView({block:'start'}));
  const ix=matching.findIndex(x=>x.id===id);el('prev').disabled=ix<1;el('next').disabled=ix<0||ix===matching.length-1;
  if(!el('detail').open)el('detail').showModal();el('detail').scrollTop=0;history.replaceState(null,'','#'+encodeURIComponent(id));
@@ -155,10 +162,10 @@ el('more').onclick=()=>{const a=el('advanced');a.hidden=!a.hidden;el('more').set
 for(const i of [...allIds,'sort'])el(i).addEventListener('input',()=>{page=1;draw()});
 el('clear').onclick=()=>{for(const id of allIds)el(id).value='';page=1;draw()};
 const years=records.map(r=>r.year).filter(Number.isFinite),pricedSet=records.filter(priced),total=k=>pricedSet.reduce((n,r)=>n+r[k],0);
-const unique=new Set(records.filter(confirmed).map(r=>r.designKey||[r.country,r.title,r.year,r.face,r.catalogue].join('|'))).size;
-const stats=[['Экземпляров',records.length],['Стран и территорий',new Set(records.map(r=>r.country).filter(known)).size],['Годы выпуска',years.length?Math.min(...years)+'–'+Math.max(...years):'Уточняются'],['Разных марок и блоков¹',unique],['Оценённая часть',pricedSet.length?(roundRub(total('low'))+(total('high')!==total('low')?' – '+roundRub(total('high')):'')):'Нет оценки']];
+const unique=new Set(records.filter(r=>confirmed(r)&&r.postalObject!==false).map(r=>r.designKey||[r.country,r.title,r.year,r.face,r.catalogue].join('|'))).size;
+const stats=[['Карточек',records.length],['Стран и территорий',new Set(records.map(r=>r.country).filter(known)).size],['Годы выпуска',years.length?Math.min(...years)+'–'+Math.max(...years):'Уточняются'],['Разных почтовых объектов¹',unique],['Оценённая часть',pricedSet.length?(roundRub(total('low'))+(total('high')!==total('low')?' – '+roundRub(total('high')):'')):'Нет оценки']];
 el('stats').innerHTML=stats.map(([k,v])=>'<div><small>'+esc(k)+'</small><strong>'+esc(v)+'</strong></div>').join('');
-el('valuation').textContent='¹ Разные рисунки и номиналы посчитаны по подтверждённым записям. Диапазон лет охватывает датированные выпуски. Оценено '+pricedSet.length+' из '+records.length+' экземпляров. Для суммы выбраны сопоставимые поштучные цены. Приоритет имеют продажи, затем предложения и каталожные ориентиры. При неизвестном гашении для диапазона нужны цены обеих категорий из одного типа источников. Цены комплектов показаны отдельно. Для советской части основной справочник — электронный каталог Загорского. При наличии сопоставимой сделки или предложения приоритет переходит к ним. Если за 12 месяцев найдено три сопоставимых поштучных продажи, в карточке также показана их медиана. Рублёвые суммы пересчитаны по курсам Банка России на 03.11.2026. Для архивных котировок в левах использован фиксированный курс 1,95583 лева за евро.';
+el('valuation').textContent='¹ Сцепки и блоки представлены одной карточкой; отдельные купоны и непочтовые знаки имеют собственный тип и исключены из числа разных почтовых объектов. Разные рисунки и номиналы посчитаны по подтверждённым записям. Диапазон лет охватывает датированные выпуски. Оценено '+pricedSet.length+' из '+records.length+' экземпляров. Для суммы выбраны сопоставимые поштучные цены. Приоритет имеют продажи, затем предложения и каталожные ориентиры. При неизвестном гашении для диапазона нужны цены обеих категорий из одного типа источников. Цены комплектов показаны отдельно. Для советской части основной справочник — электронный каталог Загорского. При наличии сопоставимой сделки или предложения приоритет переходит к ним. Если за 12 месяцев найдено три сопоставимых поштучных продажи, в карточке также показана их медиана. Рублёвые суммы пересчитаны по курсам Банка России на 03.11.2026. Для архивных котировок в левах использован фиксированный курс 1,95583 лева за евро.';
 const basisLabels=['sold','asking','catalogue'];
 el('basisBreakdown').innerHTML=basisLabels.map(kind=>{
  const items=pricedSet.filter(r=>r.basisKind===kind);
@@ -186,6 +193,8 @@ const hero=window.COVER_IDS?.map(id=>records.find(r=>r.id===id)).filter(Boolean)
 el('specimens').innerHTML=hero.map(r=>'<img src="'+esc(r.thumb||r.image)+'" alt="">').join('');
 el('intro').textContent='От сипухи на советской десятикопеечной марке до венгерского Ford Model T. Листайте альбом или выберите страну на карте.';
 const saved=new URLSearchParams(location.search);
+const added=records.filter(r=>Number(r.id.slice(1,3))>=18);
+if(added.length){el('updateCount').textContent='16 новых страниц · '+added.length+' новых карточек';el('showNew').onclick=()=>{for(const id of allIds)el(id).value='';el('batch').value='Добавлено 09.11.2026';page=1;draw();el('collection').scrollIntoView();};}
 for(const id of [...allIds,'sort'])if(saved.has(id))el(id).value=saved.get(id);
 page=Math.max(1,parseInt(saved.get('page'),10)||1);
 draw();

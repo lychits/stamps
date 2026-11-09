@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 import shutil
+from pathlib import PurePosixPath
 
 ROOT = Path(__file__).resolve().parent.parent
 catalogue = json.loads((ROOT / "catalog.json").read_text())
@@ -30,12 +31,17 @@ target = stage / "atlas"
 shutil.copytree(atlas, target, ignore=shutil.ignore_patterns("images"), dirs_exist_ok=True)
 registry = (atlas / "collection.js").read_text().split("window.COLLECTION=", 1)[1]
 records = json.loads(registry.strip().removesuffix(";"))
+assert len(records) >= 493, 'Existing Atlas cards must be retained'
+assert len({r['id'] for r in records}) == len(records), 'Duplicate card IDs'
 expected = {r[key] for r in records for key in ("image", "thumb")}
-assert len(records) == 493 and len(expected) == 986
+expected.update(r['albumImage'] for r in records if r.get('albumImage'))
+assert len({r['image'] for r in records}) == len(records), 'Cards must have distinct specimen images'
 seen = set()
 for album in sorted((atlas / "images").glob("album-*.zip")):
     with ZipFile(album) as archive:
         for entry in archive.namelist():
+            relative = PurePosixPath(entry)
+            assert not relative.is_absolute() and '..' not in relative.parts, entry
             assert entry in expected and entry not in seen, entry
             archive.extract(entry, target)
             seen.add(entry)
